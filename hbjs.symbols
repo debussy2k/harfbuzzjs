@@ -39,3 +39,4 @@ _hbjs_shape_with_trace
 _malloc
 _free
 _free_ptr
+_hb_font_get_extents_for_direction
