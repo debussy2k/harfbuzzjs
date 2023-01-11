@@ -3,7 +3,7 @@
 HB_BEGIN_DECLS
 
 int
-hbjs_glyph_svg (hb_font_t *font, hb_codepoint_t glyph, char *buf, unsigned buf_size);
+hbjs_glyph_svg (hb_font_t *font, hb_codepoint_t glyph, float x, float y, char *buf, unsigned buf_size);
 
 unsigned
 hbjs_shape_with_trace (hb_font_t *font, hb_buffer_t* buf,
@@ -71,12 +71,21 @@ _user_data_printf (user_data_t *data, const char *format, ...)
 #undef BUFSIZE
 }
 
+//-------------------------------------------------------------
+struct GlyphPosition {
+  float x;
+  float y;
+  GlyphPosition(float x_, float y_) : x(x_), y(y_) {}
+};
+GlyphPosition glyphPos(0, 0);
+//-------------------------------------------------------------
+
 static void
 move_to (hb_draw_funcs_t *dfuncs, user_data_t *draw_data, hb_draw_state_t *,
 	 float to_x, float to_y,
 	 void *)
 {
-  _user_data_printf (draw_data, "M%g,%g", (double)to_x, (double)to_y);
+  _user_data_printf (draw_data, "M%g,%g", (double)(glyphPos.x + to_x), (double)(glyphPos.y - to_y));
 }
 
 static void
@@ -84,7 +93,7 @@ line_to (hb_draw_funcs_t *dfuncs, user_data_t *draw_data, hb_draw_state_t *,
 	 float to_x, float to_y,
 	 void *)
 {
-  _user_data_printf (draw_data, "L%g,%g", (double)to_x, (double)to_y);
+  _user_data_printf (draw_data, "L%g,%g", (double)(glyphPos.x + to_x), (double)(glyphPos.y - to_y));
 }
 
 static void
@@ -94,10 +103,10 @@ quadratic_to (hb_draw_funcs_t *dfuncs, user_data_t *draw_data, hb_draw_state_t *
 	      void *)
 {
   _user_data_printf (draw_data, "Q%g,%g %g,%g",
-                     (double)control_x,
-                     (double)control_y,
-                     (double)to_x,
-                     (double)to_y);
+                     (double)(glyphPos.x + control_x),
+                     (double)(glyphPos.y - control_y),
+                     (double)(glyphPos.x + to_x),
+                     (double)(glyphPos.y - to_y));
 }
 
 static void
@@ -108,12 +117,12 @@ cubic_to (hb_draw_funcs_t *dfuncs, user_data_t *draw_data, hb_draw_state_t *,
 	  void *)
 {
   _user_data_printf (draw_data, "C%g,%g %g,%g %g,%g",
-                     (double)control1_x,
-                     (double)control1_y,
-                     (double)control2_x,
-                     (double)control2_y,
-                     (double)to_x,
-                     (double)to_y);
+                     (double)(glyphPos.x + control1_x),
+                     (double)(glyphPos.y - control1_y),
+                     (double)(glyphPos.x + control2_x),
+                     (double)(glyphPos.y - control2_y),
+                     (double)(glyphPos.x + to_x),
+                     (double)(glyphPos.y - to_y));
 }
 
 static void
@@ -125,7 +134,7 @@ close_path (hb_draw_funcs_t *dfuncs, user_data_t *draw_data, hb_draw_state_t *, 
 static hb_draw_funcs_t *funcs = 0;
 
 int
-hbjs_glyph_svg (hb_font_t *font, hb_codepoint_t glyph, char *buf, unsigned buf_size)
+hbjs_glyph_svg (hb_font_t *font, hb_codepoint_t glyph, float x, float y, char *buf, unsigned buf_size)
 {
   if (funcs == 0) /* not the best pattern for multi-threaded apps which is not a concern here */
   {
@@ -136,6 +145,9 @@ hbjs_glyph_svg (hb_font_t *font, hb_codepoint_t glyph, char *buf, unsigned buf_s
     hb_draw_funcs_set_cubic_to_func (funcs, (hb_draw_cubic_to_func_t) cubic_to, nullptr, nullptr);
     hb_draw_funcs_set_close_path_func (funcs, (hb_draw_close_path_func_t) close_path, nullptr, nullptr);
   }
+
+  glyphPos.x = x;
+  glyphPos.y = y;
 
   user_data_t draw_data(buf, buf_size);
   hb_font_get_glyph_shape (font, glyph, funcs, &draw_data);
