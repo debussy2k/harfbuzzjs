@@ -40,3 +40,4 @@ _malloc
 _free
 _free_ptr
 _hb_font_get_extents_for_direction
+_hb_feature_from_string
